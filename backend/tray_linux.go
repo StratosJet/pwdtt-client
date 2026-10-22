@@ -56,9 +56,8 @@ func startTray(iconData []byte, onShow, onToggle, onQuit func()) {
 
 	cPath := C.CString(tmp)
 	defer C.free(unsafe.Pointer(cPath))
+	// Tray initialization runs on the GTK main loop owned by Wails.
 	C.wdtt_tray_init(cPath)
-
-	go C.wdtt_gtk_main()
 }
 
 func setTrayVisible(v bool) {

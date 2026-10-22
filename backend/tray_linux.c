@@ -24,8 +24,9 @@ static GtkWidget *make_markup_item(GtkWidget **out_label, const char *markup) {
     return item;
 }
 
-void wdtt_tray_init(const char *icon_path) {
-    gtk_init(NULL, NULL);
+/* Wails owns GTK initialization and gtk_main(). Schedule all GTK work there. */
+static gboolean do_init_tray(gpointer data) {
+    char *icon_path = (char *)data;
 
     indicator = app_indicator_new("pwdtt", icon_path, APP_INDICATOR_CATEGORY_APPLICATION_STATUS);
     app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
@@ -53,6 +54,13 @@ void wdtt_tray_init(const char *icon_path) {
 
     gtk_widget_show_all(menu);
     app_indicator_set_menu(indicator, GTK_MENU(menu));
+    g_free(icon_path);
+    return G_SOURCE_REMOVE;
+}
+
+void wdtt_tray_init(const char *icon_path) {
+    /* Wails starts gtk_main on its own thread; OnStartup runs in a Go goroutine. */
+    g_idle_add(do_init_tray, g_strdup(icon_path));
 }
 
 static void update_status_label(int connected, long long rx, long long tx, int workers) {
@@ -81,7 +89,7 @@ static gboolean do_update_status(gpointer data) {
     StatusArgs *a = (StatusArgs *)data;
     update_status_label(a->connected, a->rx, a->tx, a->workers);
     g_free(a);
-    return FALSE;
+    return G_SOURCE_REMOVE;
 }
 
 void wdtt_tray_set_status(int connected, long long rx, long long tx, int workers) {
@@ -90,12 +98,14 @@ void wdtt_tray_set_status(int connected, long long rx, long long tx, int workers
     g_idle_add(do_update_status, a);
 }
 
-void wdtt_tray_set_visible(int visible) {
-    if (indicator == NULL) return;
-    app_indicator_set_status(indicator,
-        visible ? APP_INDICATOR_STATUS_ACTIVE : APP_INDICATOR_STATUS_PASSIVE);
+static gboolean do_set_visible(gpointer data) {
+    if (indicator != NULL) {
+        app_indicator_set_status(indicator,
+            GPOINTER_TO_INT(data) ? APP_INDICATOR_STATUS_ACTIVE : APP_INDICATOR_STATUS_PASSIVE);
+    }
+    return G_SOURCE_REMOVE;
 }
 
-void wdtt_gtk_main(void) {
-    gtk_main();
+void wdtt_tray_set_visible(int visible) {
+    g_idle_add(do_set_visible, GINT_TO_POINTER(visible != 0));
 }
