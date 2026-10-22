@@ -768,6 +768,10 @@ func (o *Orchestrator) maybeAutoReconnectOnStall() {
 	}
 
 	if shouldStallSoft(watch, stallDur, sinceConnect, wasActive, stallImmune, verifyPending, workers) {
+		// Reachable Internet: no user traffic is not a tunnel stall.
+		if o.internetRTT() > 0 {
+			return
+		}
 		o.triggerAutoReconnect(fmt.Sprintf("Трафик не движется %s — soft-восстановление…", stallDur.Round(time.Second)))
 	}
 }
@@ -822,11 +826,9 @@ func (o *Orchestrator) startInternetPing() {
 				fails := o.internetProbeFails
 				o.mu.Unlock()
 
-				if ms > 0 {
-					o.internetMu.Lock()
-					o.internetRTTMs = ms
-					o.internetMu.Unlock()
-				}
+				o.internetMu.Lock()
+				o.internetRTTMs = ms
+				o.internetMu.Unlock()
 				if ms == 0 && fails >= internetProbeFailNeed {
 					o.maybeAutoReconnectOnProbeFail()
 				}
