@@ -235,7 +235,6 @@ func EnsureTurnDirectRoutes(turnIPs []string) {
 	}
 	rememberWGGateway(gw)
 	activeRoutesMu.Lock()
-	defer activeRoutesMu.Unlock()
 	for _, tip := range turnIPs {
 		if net.ParseIP(tip) == nil {
 			continue
@@ -245,6 +244,7 @@ func EnsureTurnDirectRoutes(turnIPs []string) {
 			activeRoutes = append(activeRoutes, cidr)
 		}
 	}
+	activeRoutesMu.Unlock()
 	_ = installVKTransportRoutes(gw)
 }
 
